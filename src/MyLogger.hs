@@ -18,21 +18,17 @@ myLogTitles
     -> Logger
 myLogTitles sep1 sep2 formatCount formatFoc formatUnfoc = do
     winset <- gets windowset
-    let focWin = W.peek winset
-        wins   = W.index winset
-        count  = length wins
-    winNamesNonFoc <- traverse (fmap show . getName)
-        $ filter (\w -> Just w /= focWin) wins
+    let focWin     = W.peek winset
+        wins       = W.index winset
+        winsNonFoc = filter (\w -> Just w /= focWin) wins
+        count      = length wins
+    winNamesNonFoc <- case winsNonFoc of
+        [] -> pure ""
+        xs -> (sep2 ++) . formatUnfoc <$> traverse (fmap show . getName) xs
     focWinName <- case focWin of
-        Just justFoc -> show <$> getName justFoc
+        Just justFoc -> (sep1 ++) . formatFoc . show <$> getName justFoc
         Nothing      -> pure ""
-    pure
-        .  Just
-        $  formatCount count
-        ++ sep1
-        ++ formatFoc focWinName
-        ++ sep2
-        ++ formatUnfoc winNamesNonFoc
+    pure . Just $ formatCount count ++ focWinName ++ winNamesNonFoc
 
 
 logWindowCount :: X (Maybe String)
