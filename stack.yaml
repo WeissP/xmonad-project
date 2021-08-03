@@ -33,6 +33,8 @@ packages:
 - .
 - xmonad-git
 - xmonad-contrib-git
+# - Unique-0.4.7.8
+
 # Dependency packages to be pulled from upstream that are not in the resolver.
 # These entries can reference officially published versions as well as
 # forks / in-progress versions pinned to a git hash. For example:
@@ -42,7 +44,8 @@ packages:
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
-# extra-deps: []
+extra-deps: 
+- Unique-0.4.7.8@sha256:9661f45aa31dde119a2114566166ea38b011a45653337045ee4ced75636533c0,2067
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

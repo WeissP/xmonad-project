@@ -1,19 +1,46 @@
 {-# LANGUAGE LambdaCase #-}
 
 module MyWindowOperations where
+import           Data.List.Unique
 import qualified Data.Map                      as M
+import qualified Data.Map
+import           Data.Maybe
 import           MyLogger
-import           XMonad.Util.Loggers
 import           XMonad
 import qualified XMonad.StackSet               as W
+import           XMonad.Util.Loggers
 
 isMaster :: W.StackSet i l a s sd -> Bool
 isMaster ss = case W.stack . W.workspace . W.current $ ss of
     Just (W.Stack _ [] _) -> True
     _                     -> False
 
-myFocusDown :: X ()
-myFocusDown = do
+isFloating :: Window -> X Bool
+isFloating w = do
+    ws <- gets windowset
+    return $ M.member w (W.floating ws)
+
+existsFloating :: X Bool
+existsFloating = withWindowSet $ \winSet -> do
+    let windows      = W.integrate' (W.stack . W.workspace . W.current $ winSet)
+        allFloatings = W.floating winSet
+    return $ not $ allUnique $ windows ++ M.keys allFloatings
+
+myFocusDownPure :: X ()
+myFocusDownPure =
+    focusWithFloating (windows (`skipFloating` W.focusDown)) myFocusDownPure'
+
+myFocusUpPure :: X ()
+myFocusUpPure =
+    focusWithFloating (windows (`skipFloating` W.focusUp)) myFocusUpPure'
+
+focusWithFloating :: X () -> X () -> X ()
+focusWithFloating withFloating withoutFloating = do
+    floatP <- existsFloating
+    if floatP then withFloating else withoutFloating
+
+myFocusDownPure' :: X ()
+myFocusDownPure' = do
     l <- logLayout
     case trimLayoutModifiers l of
         Just "TwoPane"     -> windows focusDownTwoPane
@@ -28,8 +55,8 @@ myFocusDown = do
         W.Stack l [] (r1 : r2 : down) -> W.Stack r1 [l] (r2 : down)
         _ -> W.focusDown' stack
 
-myFocusUp :: X ()
-myFocusUp = do
+myFocusUpPure' :: X ()
+myFocusUpPure' = do
     l <- logLayout
     case trimLayoutModifiers l of
         Just "TwoPane"     -> windows focusUpTwoPane
@@ -43,8 +70,8 @@ myFocusUp = do
         W.Stack l [] (r1 : r2 : down) -> W.Stack r2 [l] (r1 : down)
         _ -> W.focusUp' stack
 
-mySwapMaster :: X ()
-mySwapMaster = do
+mySwapMasterPure :: X ()
+mySwapMasterPure = do
     l <- logLayout
     case trimLayoutModifiers l of
         Just "TwoPane" -> windows swapMasterTwoPane
@@ -88,12 +115,36 @@ shiftThenSwitchOrFocus i = do
     windows $ W.shift i
     switchOrFocus i
 
-moveFloat :: X () -> X ()
-moveFloat f = do
-    m <- logMaster
-    l <- logLayout
-    f
-    case (m, f) of
-        (True, _) -> withFocused (`tileWindow` Rectangle 50 50 200 200)
-        _         -> withFocused (`tileWindow` Rectangle 50 50 500 500)
+
+
+-- comes from https://gist.github.com/gilbertw1/603c3af68a21a10f1833
+skipFloating
+    :: (Eq a, Ord a)
+    => W.StackSet i l a s sd
+    -> (W.StackSet i l a s sd -> W.StackSet i l a s sd)
+    -> W.StackSet i l a s sd
+skipFloating stacks f | isNothing curr = stacks
+                      | -- short circuit if there is no currently focused window
+                        otherwise      = skipFloatingR stacks curr f
+    where curr = W.peek stacks
+
+skipFloatingR
+    :: (Eq a, Ord a)
+    => W.StackSet i l a s sd
+    -> (Maybe a)
+    -> (W.StackSet i l a s sd -> W.StackSet i l a s sd)
+    -> W.StackSet i l a s sd
+skipFloatingR stacks startWindow f
+    | isNothing nextWindow      = stacks
+    | -- next window is nothing return current stack set
+      nextWindow == startWindow = newStacks
+    | -- if next window is the starting window then return the new stack set
+      M.notMember (fromJust nextWindow) (W.floating stacks) = newStacks
+    | -- if next window is not a floating window return the new stack set
+      otherwise                 = skipFloatingR newStacks startWindow f -- the next window is a floating window so keep recursing (looking)
+  where
+    newStacks  = f stacks
+    nextWindow = W.peek newStacks
+
+
 

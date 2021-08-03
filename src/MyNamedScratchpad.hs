@@ -1,8 +1,6 @@
 module MyNamedScratchpad where
 
 import           XMonad
-import           XMonad.Actions.DynamicWorkspaces
-                                                ( addHiddenWorkspace )
 import           XMonad.Actions.SpawnOn         ( spawnHere )
 import           XMonad.Hooks.DynamicLog        ( PP
                                                 , ppSort
@@ -17,6 +15,12 @@ import           XMonad.Prelude                 ( filterM
 
 import qualified Data.List.NonEmpty            as NE
 
+import           Control.Concurrent
+import           Control.Monad
+import qualified Data.Map                      as M
+import           Data.Maybe
+import           MyWindowOperations
+import           System.Timeout
 import qualified XMonad.StackSet               as W
 
 -- | Single named scratchpad configuration
@@ -24,23 +28,61 @@ data NamedScratchpad = NS
     { name  :: String      -- ^ Scratchpad name
     , cmd   :: String      -- ^ Command used to run application
     , query :: Query Bool  -- ^ Query to find already running application
-    , hook  :: ManageHook  -- ^ Manage hook called for application window, use it to define the placement. See @nonFloating@, @defaultFloating@ and @customFloating@
+    , after :: Window -> X ()         -- ^ this function will be called after the scratchpad is shifted to the current workspace
     }
-
--- | Manage hook that makes the window non-floating
-nonFloating :: ManageHook
-nonFloating = idHook
-
--- | Manage hook that makes the window floating with the default placement
-defaultFloating :: ManageHook
-defaultFloating = doFloat
-
--- | Manage hook that makes the window floating with custom placement
-customFloating :: W.RationalRect -> ManageHook
-customFloating = doRectFloat
 
 -- | Named scratchpads configuration
 type NamedScratchpads = [NamedScratchpad]
+
+existsNsp :: NamedScratchpads -> X Bool
+existsNsp nsp = withWindowSet $ \winSet -> isJust <$> findNspFromWindows
+    nsp
+    (W.integrate' (W.stack . W.workspace . W.current $ winSet))
+
+focusWithNsp :: X () -> NamedScratchpads -> X ()
+focusWithNsp f scratchpads = withFocused $ \win -> do
+    mShiftedScratchpads <- shiftBackAllNspFromCurrentWsp scratchpads
+    case mShiftedScratchpads of
+        []                 -> f
+        shiftedScratchpads -> do
+            f
+            withFocused $ \focused -> do
+                shiftHereAllNsp shiftedScratchpads
+                focus focused
+
+myFocusDownWithNSP :: NamedScratchpads -> X ()
+myFocusDownWithNSP = focusWithNsp myFocusDownPure
+
+myFocusUpWithNSP :: NamedScratchpads -> X ()
+myFocusUpWithNSP = focusWithNsp myFocusUpPure
+
+mySwapMasterWithNsp :: NamedScratchpads -> X ()
+mySwapMasterWithNsp scratchpads = withFocused $ \win -> do
+    mShiftedScratchpads <- shiftBackAllNspFromCurrentWsp scratchpads
+    case mShiftedScratchpads of
+        []                 -> mySwapMasterPure
+        shiftedScratchpads -> withFocused $ \focused -> do
+            shiftHereAllNsp shiftedScratchpads
+            focus focused
+
+findNsp :: NamedScratchpads -> Window -> X (Maybe NamedScratchpad)
+findNsp []       a = return Nothing
+findNsp (x : xs) a = do
+    fromNsp <- runQuery (query x) a
+    if fromNsp then return (Just x) else findNsp xs a
+
+findNspFromWindows :: NamedScratchpads -> [Window] -> X (Maybe NamedScratchpad)
+findNspFromWindows _           []       = return Nothing
+findNspFromWindows scratchpads (a : as) = do
+    mNsp <- findNsp scratchpads a
+    case mNsp of
+        Nothing  -> findNspFromWindows scratchpads as
+        Just nsp -> return $ Just nsp
+
+findNspCurrentWsp :: NamedScratchpads -> X (Maybe NamedScratchpad)
+findNspCurrentWsp nsp = withWindowSet $ \winSet -> findNspFromWindows nsp
+    $ W.integrate' (W.stack . W.workspace . W.current $ winSet)
+
 
 -- | Finds named scratchpad configuration by name
 findByName :: NamedScratchpads -> String -> Maybe NamedScratchpad
@@ -81,31 +123,6 @@ customRunNamedScratchpadAction =
 allNamedScratchpadAction :: NamedScratchpads -> String -> X ()
 allNamedScratchpadAction = someNamedScratchpadAction mapM_ runApplication
 
--- | A @logHook@ to hide scratchpads when they lose focus.  This can be
--- useful for e.g. dropdown terminals.  Note that this also requires you
--- to use the 'XMonad.Hooks.RefocusLast.refocusLastLogHook'.
---
--- ==== __Example__
---
--- > import XMonad.Hooks.RefocusLast (refocusLastLogHook)
--- > import XMonad.Util.NamedScratchpad
--- >
--- > main = xmonad $ def
--- >   { logHook = refocusLastLogHook
--- >            >> nsHideOnFocusLoss myScratchpads
--- >               -- enable hiding for all of @myScratchpads@
--- >   }
-nsHideOnFocusLoss :: NamedScratchpads -> X ()
-nsHideOnFocusLoss scratches = withWindowSet $ \winSet -> do
-    let cur = W.currentTag winSet
-    withRecentsIn cur () $ \lastFocus _ ->
-        when (lastFocus `elem` W.index winSet && cur /= scratchpadWorkspaceTag)
-            $ whenX (isNS lastFocus)
-            $ shiftToNSP (W.workspaces winSet) ($ lastFocus)
-  where
-    isNS :: Window -> X Bool
-    isNS w = or <$> traverse ((`runQuery` w) . query) scratches
-
 -- | execute some action on a named scratchpad
 someNamedScratchpadAction
     :: ((Window -> X ()) -> NE.NonEmpty Window -> X ())
@@ -116,43 +133,78 @@ someNamedScratchpadAction
 someNamedScratchpadAction f runApp scratchpadConfig scratchpadName =
     case findByName scratchpadConfig scratchpadName of
         Just conf -> withWindowSet $ \winSet -> do
-            let focusedWspWindows = maybe
-                    []
-                    W.integrate
-                    (W.stack . W.workspace . W.current $ winSet)
-                allWindows = W.allWindows winSet
-            matchingOnCurrent <- filterM (runQuery (query conf))
-                                         focusedWspWindows
-            matchingOnAll <- filterM (runQuery (query conf)) allWindows
-
-            case NE.nonEmpty matchingOnCurrent of
-                -- no matching window on the current workspace -> scratchpad not running or in background
-                Nothing -> case NE.nonEmpty matchingOnAll of
-                    Nothing -> runApp conf
-                    Just wins ->
+            matchingOnAll <- filterM (runQuery (query conf))
+                                     (W.allWindows winSet)
+            let nonMatchedOnCurrent = case NE.nonEmpty matchingOnAll of
+                    Nothing -> do
+                        runApp conf
+                        -- waitRun 10000 conf
+                    Just wins -> do
                         f (windows . W.shiftWin (W.currentTag winSet)) wins
+                        after conf (NE.head wins)
+            case W.stack . W.workspace . W.current $ winSet of
+                Nothing     -> nonMatchedOnCurrent
+                Just curStk -> do
+                    isFocused         <- runQuery (query conf) (W.focus curStk)
+                    matchingOnCurrent <- filterM (runQuery (query conf))
+                                                 (W.integrate curStk)
+                    case NE.nonEmpty matchingOnCurrent of
+                        Nothing   -> nonMatchedOnCurrent
+                        Just wins -> if isFocused
+                            then shiftBack (W.focus curStk)
+                            else focus (NE.head wins)
 
-                -- matching window running on current workspace -> window should be shifted to scratchpad workspace
-                Just wins -> shiftToNSP (W.workspaces winSet) (`f` wins)
         Nothing -> return ()
+  where
+    waitRun :: Int -> NamedScratchpad -> X ()
+    waitRun limit conf = if limit <= 0
+        then return ()
+        else withWindowSet $ \winSet -> do
+            refresh
+            matchingOnAll <- filterM (runQuery (query conf))
+                                     (W.allWindows winSet)
+            case NE.nonEmpty matchingOnAll of
+                Nothing   -> waitRun (limit - 1) conf
+                Just wins -> do
+                    windows $ W.focusWindow (NE.head wins)
+                    after conf (NE.head wins)
 
 -- | Tag of the scratchpad workspace
 scratchpadWorkspaceTag :: String
-scratchpadWorkspaceTag = "NSP"
+scratchpadWorkspaceTag = "板"
 
--- | Manage hook to use with named scratchpads
-namedScratchpadManageHook
-    :: NamedScratchpads -- ^ Named scratchpads configuration
-    -> ManageHook
-namedScratchpadManageHook = composeAll . fmap (\c -> query c --> hook c)
+shiftBack :: Window -> X ()
+shiftBack a = windows $ W.shiftWin scratchpadWorkspaceTag a
+
+shiftBackAllNsp :: NamedScratchpads -> [Window] -> X NamedScratchpads
+shiftBackAllNsp _           []       = return []
+shiftBackAllNsp scratchpads (a : as) = do
+    mScratchpad <- findNsp scratchpads a
+    case mScratchpad of
+        Nothing -> shiftBackAllNsp scratchpads as
+        Just scratchpad ->
+            shiftBack a >> fmap (scratchpad :) (shiftBackAllNsp scratchpads as)
+
+shiftBackAllNspFromCurrentWsp :: NamedScratchpads -> X NamedScratchpads
+shiftBackAllNspFromCurrentWsp scratchpads = withWindowSet $ \winSet ->
+    shiftBackAllNsp
+        scratchpads
+        (W.integrate' (W.stack . W.workspace . W.current $ winSet))
+
+
+shiftHereAllNsp :: NamedScratchpads -> X ()
+shiftHereAllNsp scratchpads = foldr
+    (\elem res -> namedScratchpadAction scratchpads $ name elem)
+    (return ())
+    scratchpads
 
 -- | Shift some windows to the scratchpad workspace according to the
 -- given function.  The workspace is created if necessary.
-shiftToNSP :: [WindowSpace] -> ((Window -> X ()) -> X ()) -> X ()
-shiftToNSP ws f = do
-    unless (any ((scratchpadWorkspaceTag ==) . W.tag) ws)
-        $ addHiddenWorkspace scratchpadWorkspaceTag
-    f (windows . W.shiftWin scratchpadWorkspaceTag)
+-- shiftToNSP :: [WindowSpace] -> ((Window -> X ()) -> X ()) -> X ()
+-- shiftToNSP ws f = do
+--     unless (any ((scratchpadWorkspaceTag ==) . W.tag) ws)
+--         $ addHiddenWorkspace scratchpadWorkspaceTag
+--     f (windows . W.shiftWin scratchpadWorkspaceTag)
 
 -- | Transforms a workspace list containing the NSP workspace into one that
 -- doesn't contain it. Intended for use with logHooks.
@@ -176,5 +228,6 @@ namedScratchpadFilterOutWorkspacePP :: PP -> PP
 namedScratchpadFilterOutWorkspacePP pp =
     pp { ppSort = fmap (. namedScratchpadFilterOutWorkspace) (ppSort pp) }
 {-# DEPRECATED namedScratchpadFilterOutWorkspacePP "Use XMonad.Hooks.DynamicLog.filterOutWsPP [scratchpadWorkspaceTag] instead" #-}
+{-# OPTIONS_GHC -Wno-deferred-type-errors #-}
 
 -- vim:ts=4:shiftwidth=4:softtabstop=4:expandtab:foldlevel=20:

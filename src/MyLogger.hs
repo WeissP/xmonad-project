@@ -4,9 +4,14 @@ import           Data.List
 import           Data.Maybe
 import           Text.Regex
 import           XMonad
+import           XMonad.Hooks.StatusBar.PP
 import qualified XMonad.StackSet               as W
 import           XMonad.Util.Loggers
 import           XMonad.Util.NamedWindows
+
+totalTitlesLength, unfocusedTitleLength :: Int
+totalTitlesLength = 65
+unfocusedTitleLength = 15
 
 -- receive one sperate and three funs to format count, focused window and unfocused window
 myLogTitles
@@ -18,17 +23,22 @@ myLogTitles
     -> Logger
 myLogTitles sep1 sep2 formatCount formatFoc formatUnfoc = do
     winset <- gets windowset
-    let focWin     = W.peek winset
-        wins       = W.index winset
-        winsNonFoc = filter (\w -> Just w /= focWin) wins
-        count      = length wins
-    winNamesNonFoc <- case winsNonFoc of
+    let focWin    = W.peek winset
+        wins      = W.index winset
+        winsUnfoc = filter (\w -> Just w /= focWin) wins
+        count     = length wins
+    winNamesUnfoc <- case winsUnfoc of
         [] -> pure ""
         xs -> (sep2 ++) . formatUnfoc <$> traverse (fmap show . getName) xs
     focWinName <- case focWin of
-        Just justFoc -> (sep1 ++) . formatFoc . show <$> getName justFoc
-        Nothing      -> pure ""
-    pure . Just $ formatCount count ++ focWinName ++ winNamesNonFoc
+        Just justFoc ->
+            (sep1 ++)
+                .   formatFoc
+                .   shorten (totalTitlesLength - (count - 1) * unfocusedTitleLength)
+                .   show
+                <$> getName justFoc
+        Nothing -> pure ""
+    pure . Just $ formatCount count ++ focWinName ++ winNamesUnfoc
 
 
 logWindowCount :: X (Maybe String)

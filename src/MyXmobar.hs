@@ -24,7 +24,7 @@ yellow = xmobarColor "#f1fa8c" ""
 red = xmobarColor "#ff5555" ""
 lowWhite = xmobarColor "#bbbbbb" ""
 
-fn1,fn2 :: String -> String
+fn1, fn2 :: String -> String
 fn1 = wrap "<fn=1>" "</fn>"
 fn2 = wrap "<fn=2>" "</fn>"
 
@@ -48,11 +48,14 @@ toPPExtras = foldl
     )
     (toX $ Normal "")
 
-myTitles = myLogTitles " "
-                       (fn1 $ blue " & ")
-                       (wrap (lowWhite "[") (lowWhite "]") . white . show)
-                       (magenta . ppWindow 30)
-                       (intercalate (fn1 $ yellow " & ") . map (yellow . ppWindow 15))
+myTitles = myLogTitles
+    " "
+    (fn1 $ blue " & ")
+    (wrap (lowWhite "[") (lowWhite "]") . white . show)
+    magenta
+    ( intercalate (fn1 $ yellow " & ")
+    . map (yellow . ppWindow unfocusedTitleLength)
+    )
 
 myXmobarPP :: PP
 myXmobarPP = def

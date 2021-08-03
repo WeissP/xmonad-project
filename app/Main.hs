@@ -1,15 +1,12 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE KindSignatures #-}
 
 
 module Main where
 
-import           Data.List
-import qualified Data.Map                      as M
 import           Data.Maybe
-import           Data.Semigroup
 import           MyLogger
+import           MyNamedScratchpad
 import           MyWindowOperations
 import           MyXmobar
 import           System.IO                      ( hPutStrLn )
@@ -23,16 +20,10 @@ import           XMonad.Hooks.EwmhDesktops
 import           XMonad.Hooks.ManageDocks
 import           XMonad.Hooks.ManageHelpers
 import           XMonad.Hooks.StatusBar
-import           XMonad.Layout.Accordion
-import           XMonad.Layout.BorderResize
-import           XMonad.Layout.DragPane
-import           XMonad.Layout.LayoutBuilder
 import           XMonad.Layout.LayoutModifier
 import           XMonad.Layout.NoBorders
 import           XMonad.Layout.NoFrillsDecoration
-import           XMonad.Layout.PerWorkspace
 import           XMonad.Layout.Spacing
-import           XMonad.Layout.Tabbed
 import           XMonad.Layout.TwoPane
 import           XMonad.Layout.WindowArranger
 import           XMonad.Layout.WindowNavigation
@@ -42,20 +33,15 @@ import           XMonad.Prompt                  ( XPConfig(..)
                                                 , height
                                                 , position
                                                 )
--- import           XMonad.Prompt.Pass
 import qualified XMonad.StackSet               as W
 import           XMonad.Util.EZConfig
 import           XMonad.Util.Loggers
-import           XMonad.Util.NamedScratchpad
 import           XMonad.Util.Paste
 import           XMonad.Util.Run                ( runInTerm
                                                 , runProcessWithInput
                                                 , safeSpawn
                                                 , spawnPipe
                                                 )
-import           XMonad.Util.Themes
-import           XMonad.Util.Ungrab
-
 myTerminal = "alacritty"
 
 myBorderWidth :: Dimension
@@ -72,9 +58,11 @@ myModMask = mod4Mask
 
 myWorkspaces :: [WorkspaceId]
 myWorkspaces =
-    zipWith (\i n -> show i ++ n) [1 .. 9 :: Int]
-        $  map (":" ++) ["主", "副", "娱", "邮", "NSP"]
-        ++ repeat ""
+    zipWith (\i n -> show i ++ n)
+            [1 .. 8 :: Int]
+            (map (":" ++) ["主", "副", "娱", "邮"] ++ repeat "")
+
+        ++ [scratchpadWorkspaceTag]
 
 mylogLayout :: Logger
 mylogLayout = withWindowSet $ return . Just . ld
@@ -103,8 +91,9 @@ myLayout =
         $   mySpacing
         $   smartBorders
         $   mouseResize
-        $   windowArrange
-        twoPane ||| myTall ||| Mirror myTall
+        $   windowArrange twoPane
+        ||| myTall
+        ||| Mirror myTall
   where
     -- addTopBar = noFrillsDeco shrinkText topBarTheme
     twoPane = TwoPane delta ratio
@@ -120,7 +109,7 @@ myKeys =
           "rofi -run-list-command \". /home/weiss/weiss/zsh_aliases.sh\" -run-command \"/bin/zsh -i -c '{cmd}'\" -show run"
       )
         , ("<XF86Launch5>", nextScreen)
-        , ("<F6>", namedScratchpadAction myScratchPads "tmux")
+        , ("<F6>", spawnHereNamedScratchpadAction myScratchPads "tmux")
         , ("<F11>"        , withFocused toggleFloat)
         , ( "M-3"
           , spawn
@@ -130,13 +119,15 @@ myKeys =
         , ("M-<Escape>"   , kill)
         , ("M-1"          , myFocusUp)
         , ("M-2"          , myFocusDown)
-        -- , ("C-v"          , unGrab *> spawn "xdotool ")
+        -- , ("M-3"          , )
         -- , ("M-4"          , moveFloat $ namedScratchpadAction myScratchPads "tmux")
-        , ( "M-4"
-          , spawn
-              "/home/weiss/.local/bin/xmobar -x 1 /home/weiss/.xmonad/xmobar/xmobarrc0.hs"
-          )
         ]
+        ++ [ ("M-4 " ++ key, fun)
+           | (key, fun) <-
+               [ ("v", spawnHereNamedScratchpadAction myScratchPads "pavu")
+               , ("t", windows (`skipFloating` W.focusDown))
+               ]
+           ]
         ++ [ (keyPrefix ++ " " ++ k, fun i)
            | (k, i) <- zip ["m", ",", ".", "j", "k", "l", "u", "i", "o"]
                            myWorkspaces
@@ -164,11 +155,31 @@ myScratchPads =
     [ NS "tmux"
          (myTerminal ++ " -e /home/weiss/weiss/tmux-init.sh")
          (title =? "tmux-Scratchpad")
-         (customFloating $ W.RationalRect (1 / 6) (1 / 6) (2 / 3) (2 / 3))
+         moveFloat
+    , NS "pavu" "pavucontrol" (className =? "Pavucontrol") moveFloat
     ]
+  where
+    moveFloat :: Window -> X ()
+    moveFloat a = do
+        m <- logMaster
+        l <- logLayout
+        case (m, trimLayoutModifiers l) of
+            (True, Just "Mirror Tall") -> windows $ W.float
+                a
+                (W.RationalRect (1 / 50) (26 / 50) (45 / 50) (20 / 50))
+            (False, Just "Mirror Tall") -> windows $ W.float
+                a
+                (W.RationalRect (1 / 50) (5 / 50) (45 / 50) (20 / 50))
+            (True, _) -> windows $ W.float
+                a
+                (W.RationalRect (26 / 50) (6 / 50) (23 / 50) (20 / 50))
+            (False, _) -> windows $ W.float
+                a
+                (W.RationalRect (1 / 50) (6 / 50) (23 / 50) (20 / 50))
+
 
 myManageHook :: ManageHook
-myManageHook = namedScratchpadManageHook myScratchPads <+> composeAll
+myManageHook = composeAll
     (concat
         [ [isDialog --> doFloat]
         , [className =? "Thunderbird" --> doShift (getWorkspace 4)]
@@ -189,23 +200,12 @@ myManageHook = namedScratchpadManageHook myScratchPads <+> composeAll
         in  fmap (matchReg x) q
     myIgnoreClass         = ["trayer"]
     myHideIgnoreClass     = ["Blueman-applet"]
-    myCenterFloatClass    = ["Blueman-manager", "zoom"]
+    myCenterFloatClass    = ["Blueman-manager", "zoom", "Pavucontrol"]
     myCenterFloatTitle    = ["tmux-Scratchpad"]
     myCenterFloatTitleReg = []
     myFullFloatClass      = ["MPlayer"]
     netName               = stringProperty "_NET_WM_NAME"
 
-
-
-
-myHandleEventHook :: Event -> X All
-myHandleEventHook = dynamicPropertyChange
-    "WM_NAME"
-    (title =? "tmux-Scratchpad" --> floating)
-  where
-    floating = do
-        -- ms <- withFocused isMaster
-        customFloating $ W.RationalRect (26 / 50) (1 / 8) (9 / 20) (1 / 2)
 
 myConfig =
     def { modMask            = myModMask
@@ -218,7 +218,7 @@ myConfig =
         , normalBorderColor  = myNormColor
         , focusedBorderColor = myFocusColor
         -- , logHook            = myLogHook
-        , handleEventHook    = myHandleEventHook
+        -- , handleEventHook    = myHandleEventHook
         }
         -- `removeKeysP` ["M-4"]
         `additionalKeysP` myKeys
@@ -232,14 +232,15 @@ main = do
               (statusBarProp
                   "xmobar -x 1 /home/weiss/.config/xmobar/xmobarrc0.hs"
                   (pure myXmobarPP)
-                  -- (pure def)
               )
               defToggleStrutsKey
-        -- $ withSB (xmobar1 <> xmobar2 <> xmobar3)
-        $ docks
-        $ myConfig
+        $ docks myConfig
 
 getWorkspace :: Int -> String
 getWorkspace i = myWorkspaces !! (i - 1)
 
+myFocusUp,myFocusDown,mySwapMaster :: X ()
+myFocusUp = myFocusUpWithNSP myScratchPads
+myFocusDown = myFocusDownWithNSP myScratchPads
+mySwapMaster = mySwapMasterWithNsp myScratchPads
 -- ttt :: NS
