@@ -10,8 +10,8 @@ import           XMonad.Util.Loggers
 import           XMonad.Util.NamedWindows
 
 totalTitlesLength, unfocusedTitleLength :: Int
-totalTitlesLength = 65
-unfocusedTitleLength = 15
+totalTitlesLength = 90
+unfocusedTitleLength = 30
 
 -- receive one sperate and three funs to format count, focused window and unfocused window
 myLogTitles

@@ -26,8 +26,10 @@ source-repository head
 library
   exposed-modules:
       Lib
+      MyKeyPerWindow
       MyLogger
       MyNamedScratchpad
+      MyPromptPass
       MyWindowOperations
       MyXmobar
   other-modules:
@@ -38,7 +40,10 @@ library
       Unique ==0.4.7.8
     , base >=4.7 && <5
     , containers
+    , directory
+    , filepath
     , regex-compat
+    , unix
     , xmonad ==0.16.9999
     , xmonad-contrib ==0.16.999
   default-language: Haskell2010
@@ -54,7 +59,10 @@ executable xmonad-project-exe
       Unique ==0.4.7.8
     , base >=4.7 && <5
     , containers
+    , directory
+    , filepath
     , regex-compat
+    , unix
     , xmonad ==0.16.9999
     , xmonad-contrib ==0.16.999
     , xmonad-project
@@ -72,7 +80,10 @@ test-suite xmonad-project-test
       Unique ==0.4.7.8
     , base >=4.7 && <5
     , containers
+    , directory
+    , filepath
     , regex-compat
+    , unix
     , xmonad ==0.16.9999
     , xmonad-contrib ==0.16.999
     , xmonad-project

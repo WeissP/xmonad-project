@@ -7,6 +7,7 @@ module Main where
 import           Data.Maybe
 import           MyLogger
 import           MyNamedScratchpad
+import           MyPromptPass
 import           MyWindowOperations
 import           MyXmobar
 import           System.IO                      ( hPutStrLn )
@@ -42,6 +43,7 @@ import           XMonad.Util.Run                ( runInTerm
                                                 , safeSpawn
                                                 , spawnPipe
                                                 )
+import           XMonad.Util.Ungrab
 myTerminal = "alacritty"
 
 myBorderWidth :: Dimension
@@ -83,7 +85,7 @@ myXPConfig :: XPConfig
 myXPConfig = def { position     = Top
                  , font         = "xft:DejaVu Sans:size=9"
                  , height       = 40
-                 , autoComplete = Just 0
+                 , autoComplete = Just 800
                  }
 
 myLayout =
@@ -104,11 +106,11 @@ myLayout =
 
 myKeys :: [([Char], X ())]
 myKeys =
-    [ ( "<XF86Launch8>"
+    [ ( "<XF86Launch5>"
       , spawn
           "rofi -run-list-command \". /home/weiss/weiss/zsh_aliases.sh\" -run-command \"/bin/zsh -i -c '{cmd}'\" -show run"
       )
-        , ("<XF86Launch5>", nextScreen)
+        , ("<XF86Launch8>", nextScreen)
         , ("<F6>", spawnHereNamedScratchpadAction myScratchPads "tmux")
         , ("<F11>"        , withFocused toggleFloat)
         , ( "M-3"
@@ -119,7 +121,8 @@ myKeys =
         , ("M-<Escape>"   , kill)
         , ("M-1"          , myFocusUp)
         , ("M-2"          , myFocusDown)
-        -- , ("M-3"          , )
+        -- , ("C-<Tab>"      , unGrab *> spawn "xdotool key Control_L+Tab")
+        -- , ("C-<Tab>"      , myFocusDown)
         -- , ("M-4"          , moveFloat $ namedScratchpadAction myScratchPads "tmux")
         ]
         ++ [ ("M-4 " ++ key, fun)
@@ -139,9 +142,14 @@ myKeys =
            ]
         ++ [ ("<XF86Launch7> " ++ key, fun)
            | (key, fun) <-
-               [ ("n"      , withFocused $ windows . W.sink)
-               , ("t"      , sendMessage NextLayout)
-               , ("p"      , spawn "rofi-pass")
+               [ ("n", withFocused $ windows . W.sink)
+               , ("t", sendMessage NextLayout)
+               , ( "r"
+                 , spawn
+                     "if type xmonad; then xmonad --recompile && xmonad --restart; else xmessage xmonad not in \\$PATH: \"$PATH\"; fi"
+                 )
+               , ("s"      , spawn "flameshot gui")
+               , ("p"      , mkPassPrompt "select pass" sendToClj myXPConfig)
                , ("h"      , spawn "rofi-pass")
                , ("<Left>" , sendMessage $ Move L)
                , ("<Right>", sendMessage $ Move R)
@@ -230,7 +238,7 @@ main = do
         $ ewmh
         $ withEasySB
               (statusBarProp
-                  "xmobar -x 1 /home/weiss/.config/xmobar/xmobarrc0.hs"
+                  "xmobar -x 0 /home/weiss/.config/xmobar/xmobarrc0.hs"
                   (pure myXmobarPP)
               )
               defToggleStrutsKey
@@ -239,7 +247,7 @@ main = do
 getWorkspace :: Int -> String
 getWorkspace i = myWorkspaces !! (i - 1)
 
-myFocusUp,myFocusDown,mySwapMaster :: X ()
+myFocusUp, myFocusDown, mySwapMaster :: X ()
 myFocusUp = myFocusUpWithNSP myScratchPads
 myFocusDown = myFocusDownWithNSP myScratchPads
 mySwapMaster = mySwapMasterWithNsp myScratchPads
