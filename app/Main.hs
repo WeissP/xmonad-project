@@ -47,7 +47,7 @@ import           XMonad.Util.Ungrab
 myTerminal = "alacritty"
 
 myBorderWidth :: Dimension
-myBorderWidth = 2 -- Sets border width for windows
+myBorderWidth = 3 -- Sets border width for windows
 
 myNormColor :: String
 myNormColor = "#282c34" -- Border color of normal windows
@@ -62,7 +62,7 @@ myWorkspaces :: [WorkspaceId]
 myWorkspaces =
     zipWith (\i n -> show i ++ n)
             [1 .. 8 :: Int]
-            (map (":" ++) ["主", "副", "娱", "邮"] ++ repeat "")
+            (map (":" ++) ["主", "副", "娱", "邮", "音"] ++ repeat "")
 
         ++ [scratchpadWorkspaceTag]
 
@@ -93,8 +93,7 @@ myLayout =
         $   mySpacing
         $   smartBorders
         $   mouseResize
-        $   windowArrange twoPane
-        ||| myTall
+        $   windowArrange myTall
         ||| Mirror myTall
   where
     -- addTopBar = noFrillsDeco shrinkText topBarTheme
@@ -148,9 +147,11 @@ myKeys =
                  , spawn
                      "if type xmonad; then xmonad --recompile && xmonad --restart; else xmessage xmonad not in \\$PATH: \"$PATH\"; fi"
                  )
+               , ("v"      , spawn "sh /home/weiss/.screenlayout/vertical.sh")
+               , ("h"      , spawn "sh /home/weiss/.screenlayout/horizontal.sh")
                , ("s"      , spawn "flameshot gui")
                , ("p"      , mkPassPrompt "select pass" sendToClj myXPConfig)
-               , ("h"      , spawn "rofi-pass")
+               -- , ("h"      , spawn "rofi-pass")
                , ("<Left>" , sendMessage $ Move L)
                , ("<Right>", sendMessage $ Move R)
                , ("<Up>"   , sendMessage $ Move U)
@@ -190,9 +191,10 @@ myManageHook :: ManageHook
 myManageHook = composeAll
     (concat
         [ [isDialog --> doFloat]
-        , [className =? "Thunderbird" --> doShift (getWorkspace 4)]
+        , [className =? "Chromium" --> doShift (getWorkspace 2)]
         , [className =? "Google-chrome" --> doShift (getWorkspace 3)]
-        , [className =? "Spotify" --> doShift (getWorkspace 2)]
+        , [className =? "Thunderbird" --> doShift (getWorkspace 4)]
+        , [className =? "Spotify" --> doShift (getWorkspace 5)]
         , [ className =? x --> doIgnore | x <- myIgnoreClass ]
         , [ className =? x --> doHideIgnore | x <- myHideIgnoreClass ]
         , [ className =? x --> doCenterFloat | x <- myCenterFloatClass ]
@@ -226,7 +228,7 @@ myConfig =
         , normalBorderColor  = myNormColor
         , focusedBorderColor = myFocusColor
         -- , logHook            = myLogHook
-        -- , handleEventHook    = myHandleEventHook
+        , handleEventHook    = handleEventHook def <+> fullscreenEventHook
         }
         -- `removeKeysP` ["M-4"]
         `additionalKeysP` myKeys
