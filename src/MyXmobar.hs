@@ -50,36 +50,40 @@ toPPExtras = foldl
 
 myTitles = myLogTitles
     " "
-    (fn1 $ blue " & ")
+    (fn1 $ blue  " ⯰ ")
     (wrap (lowWhite "[") (lowWhite "]") . white . show)
     magenta
-    ( intercalate (fn1 $ yellow " & ")
+    ( intercalate (fn1 $ yellow " ⯰ ")
     . map (yellow . ppWindow unfocusedTitleLength)
     )
 
-myXmobarPP :: PP
-myXmobarPP = def
+myXmobarHoriPP :: PP
+myXmobarHoriPP =
+    def { ppOrder = \[_, _, _, wins] -> [wins], ppExtras = [myTitles] }
+    -- , ppRename = \s ws -> fn1 s 
+
+myXmobarVerticalPP :: PP
+myXmobarVerticalPP = def
     { ppSep           = fn2 $ blue " ⯰ " -- blue " •|• "
     , ppTitleSanitize = xmobarStrip
     , ppCurrent       = magenta . wrap " " "" . xmobarBorder "Top" "#8be9fd" 2
     , ppVisible       = white
     , ppHidden        = lowWhite . wrap " " ""
     , ppUrgent        = red . wrap (yellow "!") (yellow "!")
-    , ppOrder         = \[ws, l, _, wins] -> [ws, l, wins]
-    , ppExtras        = [myTitles]
+    , ppOrder         = \[ws, l, _] -> [ws, l]
+    -- , ppExtras        = [myTitles]
     -- , ppRename = \s ws -> fn1 s 
     }
 
+xmobarVertical = statusBarPropTo
+    "_XMONAD_LOG_Vertical"
+    "xmobar -x 0 /home/weiss/.config/xmobar/xmobarrc0.hs"
+    (pure myXmobarVerticalPP)
 
--- xmobar1 = statusBarPropTo
---     "_XMONAD_LOG_1"
---     "xmobar -x 1 /home/weiss/.config/xmobar/xmobarrc0.hs"
---     (pure myXmobarPP)
-
--- xmobar2 = statusBarPropTo
---     "_XMONAD_LOG_2"
---     "xmobar -x 1 /home/weiss/.config/xmobar/xmobarrc1.hs"
---     (pure def)
+xmobarHori = statusBarPropTo
+    "_XMONAD_LOG_Hori"
+    "xmobar -x 1 /home/weiss/.config/xmobar/xmobarrc1.hs"
+    (pure myXmobarHoriPP)
 
 -- xmobar3 = statusBarPropTo
 --     "_XMONAD_LOG_3"

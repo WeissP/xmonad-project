@@ -151,7 +151,7 @@ myKeys =
                , ("h"      , spawn "sh /home/weiss/.screenlayout/horizontal.sh")
                , ("s"      , spawn "flameshot gui")
                , ("p"      , mkPassPrompt "select pass" sendToClj myXPConfig)
-               -- , ("h"      , spawn "rofi-pass")
+  -- , ("h"      , spawn "rofi-pass")
                , ("<Left>" , sendMessage $ Move L)
                , ("<Right>", sendMessage $ Move R)
                , ("<Up>"   , sendMessage $ Move U)
@@ -239,10 +239,7 @@ main = do
         $ ewmhFullscreen
         $ ewmh
         $ withEasySB
-              (statusBarProp
-                  "xmobar -x 0 /home/weiss/.config/xmobar/xmobarrc0.hs"
-                  (pure myXmobarPP)
-              )
+              (xmobarVertical <> xmobarHori)
               defToggleStrutsKey
         $ docks myConfig
 
