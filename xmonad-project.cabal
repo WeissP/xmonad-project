@@ -36,7 +36,8 @@ library
   hs-source-dirs:
       src
   build-depends:
-      Unique ==0.4.7.8
+      MissingH
+    , Unique ==0.4.7.8
     , base >=4.7 && <5
     , containers
     , directory
@@ -55,7 +56,8 @@ executable xmonad-project-exe
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      Unique ==0.4.7.8
+      MissingH
+    , Unique ==0.4.7.8
     , base >=4.7 && <5
     , containers
     , directory
@@ -76,7 +78,8 @@ test-suite xmonad-project-test
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      Unique ==0.4.7.8
+      MissingH
+    , Unique ==0.4.7.8
     , base >=4.7 && <5
     , containers
     , directory

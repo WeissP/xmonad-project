@@ -29,6 +29,7 @@ dependencies:
 - unix
 - filepath
 - directory
+- MissingH
 
 library:
   source-dirs: src

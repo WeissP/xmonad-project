@@ -2,6 +2,7 @@ module MyXmobar where
 
 import           Data.Functor                   ( (<&>) )
 import           Data.List
+import           Data.List.Utils
 import           MyLogger
 import           XMonad
 import           XMonad.Hooks.StatusBar
@@ -49,13 +50,16 @@ toPPExtras = foldl
     )
     (toX $ Normal "")
 
+replaceSymbol :: String -> String
+replaceSymbol = replace "Ʀ" "R"
+
 myTitles = myLogTitles
     " "
-    (fn1 $ blue  " ⯰ ")
+    (fn1 $ blue " ⯰ ")
     (wrap (lowWhite "[") (lowWhite "]") . white . show)
-    magenta
+    (magenta . replaceSymbol)
     ( intercalate (fn1 $ yellow " ⯰ ")
-    . map (yellow . ppWindow unfocusedTitleLength)
+    . map (yellow . replaceSymbol . ppWindow unfocusedTitleLength)
     )
 
 myXmobarHoriPP :: PP
