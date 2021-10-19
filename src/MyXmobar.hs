@@ -24,9 +24,10 @@ yellow = xmobarColor "#f1fa8c" ""
 red = xmobarColor "#ff5555" ""
 lowWhite = xmobarColor "#bbbbbb" ""
 
-fn1, fn2 :: String -> String
+fn1, fn2, fn3 :: String -> String
 fn1 = wrap "<fn=1>" "</fn>"
 fn2 = wrap "<fn=2>" "</fn>"
+fn3 = wrap "<fn=3>" "</fn>"
 
 extrasWrap :: String -> X (Maybe String) -> String -> X (Maybe String)
 extrasWrap pre x post = fmap (wrap pre post) <$> x
