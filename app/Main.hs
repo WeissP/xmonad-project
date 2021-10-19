@@ -24,6 +24,7 @@ import           XMonad.Hooks.StatusBar
 import           XMonad.Layout.LayoutModifier
 import           XMonad.Layout.NoBorders
 import           XMonad.Layout.NoFrillsDecoration
+import           XMonad.Layout.PerScreen        ( ifWider )
 import           XMonad.Layout.Spacing
 import           XMonad.Layout.TwoPane
 import           XMonad.Layout.WindowArranger
@@ -93,7 +94,9 @@ myLayout =
         $   mySpacing
         $   smartBorders
         $   mouseResize
-        $   windowArrange myTall
+        $   windowArrange
+        $   ifWider 1500 myTall (Mirror myTall)
+        ||| myTall
         ||| Mirror myTall
   where
     -- addTopBar = noFrillsDeco shrinkText topBarTheme
@@ -107,7 +110,7 @@ myKeys :: [([Char], X ())]
 myKeys =
     [ ( "<XF86Launch5>"
       , spawn
-          "rofi -run-list-command \". /home/weiss/weiss/zsh_aliases.sh\" -run-command \"/bin/zsh -i -c '{cmd}'\" -show run"
+          "rofi -m -4 -no-lazy-grab -run-list-command \". /home/weiss/weiss/zsh_aliases.sh\" -run-command \"/bin/zsh -i -c '{cmd}'\" -show run"
       )
         , ("<XF86Launch8>", nextScreen)
         , ("<F6>", spawnHereNamedScratchpadAction myScratchPads "tmux")
@@ -151,7 +154,7 @@ myKeys =
                , ("h"      , spawn "sh /home/weiss/.screenlayout/horizontal.sh")
                , ("s"      , spawn "flameshot gui")
                , ("p"      , mkPassPrompt "select pass" sendToClj myXPConfig)
-  -- , ("h"      , spawn "rofi-pass")
+-- , ("h"      , spawn "rofi-pass")
                , ("<Left>" , sendMessage $ Move L)
                , ("<Right>", sendMessage $ Move R)
                , ("<Up>"   , sendMessage $ Move U)
@@ -238,9 +241,7 @@ main = do
     xmonad
         $ ewmhFullscreen
         $ ewmh
-        $ withEasySB
-              (xmobarVertical <> xmobarHori)
-              defToggleStrutsKey
+        $ withEasySB (xmobarVertical <> xmobarHori) defToggleStrutsKey
         $ docks myConfig
 
 getWorkspace :: Int -> String
