@@ -44,23 +44,29 @@ myFocusDownPure' = do
     l <- logLayout
     case trimLayoutModifiers l of
         Just "TwoPane"     -> windows focusDownTwoPane
-        Just "Mirror Tall" -> windows W.focusUp
+        Just "Mirror Tall" -> windows $ skipMaster W.focusUp 
+        Just "Tall"        -> windows $ skipMaster W.focusDown
         _                  -> windows W.focusDown
   where
     focusDownTwoPane :: W.StackSet i l a s sd -> W.StackSet i l a s sd
     focusDownTwoPane = W.modify' $ \stack -> case stack of
-        -- W.Stack r2 (l : r1 : up) [] -> W.Stack r1 [l] r2: [up] 
-        -- W.Stack r2 (l : r1 : up) (r3:down) -> W.Stack r3 [l] (r1 : down)
         W.Stack r1 (l : up) (r2 : down) -> W.Stack r2 [l] (r1 : up ++ down)
         W.Stack l [] (r1 : r2 : down) -> W.Stack r1 [l] (r2 : down)
         _ -> W.focusDown' stack
+    skipMaster :: (W.StackSet i l a s sd -> W.StackSet i l a s sd) -> W.StackSet i l a s sd -> W.StackSet i l a s sd
+    skipMaster f x = if isMaster x
+        then f x
+        else
+            let newS = f x
+            in  if isMaster newS then f newS else newS
 
 myFocusUpPure' :: X ()
 myFocusUpPure' = do
     l <- logLayout
     case trimLayoutModifiers l of
         Just "TwoPane"     -> windows focusUpTwoPane
-        Just "Mirror Tall" -> windows W.focusDown
+        Just "Mirror Tall" -> windows $ backToMaster W.focusDown 
+        Just "Tall"        -> windows $ backToMaster W.focusUp
         _                  -> windows W.focusUp
   where
     focusUpTwoPane :: W.StackSet i l a s sd -> W.StackSet i l a s sd
@@ -69,6 +75,8 @@ myFocusUpPure' = do
         W.Stack r1 (l : up) (r2 : down) -> W.Stack l [] (r1 : r2 : down)
         W.Stack l [] (r1 : r2 : down) -> W.Stack r2 [l] (r1 : down)
         _ -> W.focusUp' stack
+    backToMaster :: (W.StackSet i l a s sd -> W.StackSet i l a s sd) -> W.StackSet i l a s sd -> W.StackSet i l a s sd
+    backToMaster f x = if isMaster x then f x else W.focusMaster x
 
 mySwapMasterPure :: X ()
 mySwapMasterPure = do

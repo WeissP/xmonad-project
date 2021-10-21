@@ -97,7 +97,7 @@ myLayout =
         $   windowArrange
         $   ifWider 1500 myTall (Mirror myTall)
         ||| myTall
-        ||| Mirror myTall
+        ||| Mirror myTall 
   where
     -- addTopBar = noFrillsDeco shrinkText topBarTheme
     twoPane = TwoPane delta ratio
