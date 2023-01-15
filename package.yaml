@@ -21,11 +21,11 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
-- xmonad == 0.16.9999
-- xmonad-contrib == 0.16.999
+- xmonad >= 0.17
+- xmonad-contrib >= 0.17
 - regex-compat
 - containers
-- Unique == 0.4.7.8
+- Unique
 - unix
 - filepath
 - directory
