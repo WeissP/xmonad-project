@@ -21,11 +21,13 @@ import           XMonad.Hooks.EwmhDesktops
 import           XMonad.Hooks.ManageDocks
 import           XMonad.Hooks.ManageHelpers
 import           XMonad.Hooks.StatusBar
+import           XMonad.Layout.Accordion
 import           XMonad.Layout.LayoutModifier
 import           XMonad.Layout.NoBorders
 import           XMonad.Layout.NoFrillsDecoration
 import           XMonad.Layout.PerScreen        ( ifWider )
 import           XMonad.Layout.Spacing
+import           XMonad.Layout.StackTile
 import           XMonad.Layout.TwoPane
 import           XMonad.Layout.WindowArranger
 import           XMonad.Layout.WindowNavigation
@@ -95,16 +97,17 @@ myLayout =
         $   smartBorders
         $   mouseResize
         $   windowArrange
-        $   ifWider 1500 myTall (Mirror myTall)
+        $   ifWider 1500 myTall (Mirror myTall ||| myStackTile)
         ||| myTall
-        ||| Mirror myTall 
+        ||| Mirror myTall
   where
     -- addTopBar = noFrillsDeco shrinkText topBarTheme
-    twoPane = TwoPane delta ratio
-    myTall  = Tall nmaster delta ratio
-    nmaster = 1
-    ratio   = 1 / 2
-    delta   = 3 / 100
+    twoPane     = TwoPane delta ratio
+    myTall      = Tall nmaster delta ratio
+    myStackTile = StackTile 1 (3 / 100) (1 / 2)
+    nmaster     = 1
+    ratio       = 1 / 2
+    delta       = 3 / 100
 
 myKeys :: [([Char], X ())]
 myKeys =
@@ -119,7 +122,7 @@ myKeys =
           , spawn
               "if type xmonad; then xmonad --recompile && xmonad --restart; else xmessage xmonad not in \\$PATH: \"$PATH\"; fi"
           )
-        , ("<XF86Launch6>", mySwapMaster)
+          , ("<XF86Launch6>", mySwapMaster)
         , ("M-<Escape>"   , kill)
         , ("M-1"          , myFocusUp)
         , ("M-2"          , myFocusDown)
@@ -153,6 +156,8 @@ myKeys =
                , ("v"      , spawn "sh /home/weiss/.screenlayout/vertical.sh")
                , ("h"      , spawn "sh /home/weiss/.screenlayout/horizontal.sh")
                , ("s"      , spawn "flameshot gui")
+               , ("f"      , spawn "fcitx-remote -s fcitx-keyboard-de-nodeadkeys")
+               , ("w"      , spawn "/home/weiss/weiss/notify_window_title/notify_window_title.sh")
                , ("p"      , mkPassPrompt "select pass" sendToClj myXPConfig)
 -- , ("h"      , spawn "rofi-pass")
                , ("<Left>" , sendMessage $ Move L)
@@ -176,6 +181,9 @@ myScratchPads =
         m <- logMaster
         l <- logLayout
         case (m, trimLayoutModifiers l) of
+            (_, Just "StackTile") -> windows $ W.float
+                a
+                (W.RationalRect (1 / 50) (26 / 50) (45 / 50) (20 / 50))
             (True, Just "Mirror Tall") -> windows $ W.float
                 a
                 (W.RationalRect (1 / 50) (26 / 50) (45 / 50) (20 / 50))
@@ -194,10 +202,10 @@ myManageHook :: ManageHook
 myManageHook = composeAll
     (concat
         [ [isDialog --> doFloat]
-        , [className =? "Chromium" --> doShift (getWorkspace 2)]
-        , [className =? "Google-chrome" --> doShift (getWorkspace 3)]
+        -- , [className =? "Chromium" --> doShift (getWorkspace 2)]
+        -- , [className =? "Google-chrome" --> doShift (getWorkspace 3)]
         , [className =? "Thunderbird" --> doShift (getWorkspace 4)]
-        , [className =? "Spotify" --> doShift (getWorkspace 5)]
+        -- , [className =? "Spotify" --> doShift (getWorkspace 5)]
         , [ className =? x --> doIgnore | x <- myIgnoreClass ]
         , [ className =? x --> doHideIgnore | x <- myHideIgnoreClass ]
         , [ className =? x --> doCenterFloat | x <- myCenterFloatClass ]
@@ -211,9 +219,10 @@ myManageHook = composeAll
     q *=? x =
         let matchReg = \a b -> isJust $ matchRegex (mkRegex a) b
         in  fmap (matchReg x) q
-    myIgnoreClass         = ["trayer"]
-    myHideIgnoreClass     = ["Blueman-applet"]
-    myCenterFloatClass    = ["Blueman-manager", "zoom", "Pavucontrol"]
+    myIgnoreClass     = ["trayer"]
+    myHideIgnoreClass = ["Blueman-applet"]
+    myCenterFloatClass =
+        ["Blueman-manager", "zoom", "Pavucontrol", "SimpleScreenRecorder"]
     myCenterFloatTitle    = ["tmux-Scratchpad", "flameshot"]
     myCenterFloatTitleReg = []
     myFullFloatClass      = ["MPlayer"]
